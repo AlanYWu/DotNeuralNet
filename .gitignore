@@ -1,5 +1,7 @@
 .DS_Store
 dataset
+wandb
+*.ckpt
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
