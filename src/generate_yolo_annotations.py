@@ -9,6 +9,47 @@ import shutil
 from utils.dsbi_utils import read_DSBI_annotation
 from utils.angelina_utils import transform_angelina_label
 
+# --- Label conversion helpers ---
+def label_to_binary(label):
+    """
+    Convert a label (DSBI or Angelina) to a 6-digit binary string (e.g., '010101').
+    Accepts:
+      - Already a 6-digit string: returns as is
+      - A string of digits (e.g., '246'): converts to binary
+      - An int: converts to binary
+    """
+    # If already 6-digit binary
+    if isinstance(label, str) and len(label) == 6 and set(label) <= {'0', '1'}:
+        return label
+    # If label is a string of digits (e.g., '246')
+    if isinstance(label, str) and label.isdigit():
+        dots = [int(c) for c in label]
+        arr = ['0'] * 6
+        for d in dots:
+            if 1 <= d <= 6:
+                arr[d-1] = '1'
+        return ''.join(arr)
+    # If label is an int
+    if isinstance(label, int):
+        arr = ['0'] * 6
+        for i in range(6):
+            if label & (1 << i):
+                arr[i] = '1'
+        return ''.join(arr)
+    # If label is a string like '25' (dots)
+    if isinstance(label, str):
+        try:
+            dots = [int(c) for c in label if c.isdigit()]
+            arr = ['0'] * 6
+            for d in dots:
+                if 1 <= d <= 6:
+                    arr[d-1] = '1'
+            return ''.join(arr)
+        except:
+            pass
+    # Fallback: treat as all zeros
+    return '000000'
+
 # Helper: build a class mapping from all encountered labels
 class ClassMap:
     def __init__(self):
@@ -38,12 +79,12 @@ def process_dsbi(dsbi_root, output_dir, class_map):
                 rects = read_DSBI_annotation(label_path, width, height, 0.0, False)
                 yolo_lines = []
                 for left, top, right, bottom, label in rects:
-                    # Convert to YOLO format
+                    bin_label = label_to_binary(label)
                     x_center = (left + right) / 2 / width
                     y_center = (top + bottom) / 2 / height
                     w = (right - left) / width
                     h = (bottom - top) / height
-                    class_id = class_map.get_id(label)
+                    class_id = class_map.get_id(bin_label)
                     yolo_lines.append(f"{class_id} {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}")
                 # Write YOLO label file
                 rel_dir = os.path.relpath(root, dsbi_root)
@@ -83,7 +124,8 @@ def process_angelina(angelina_books_root, output_dir, class_map):
                     w = (x2 - x1) / width
                     h = (y2 - y1) / height
                     label = transform_angelina_label(shape['label'])
-                    class_id = class_map.get_id(label)
+                    bin_label = label_to_binary(label)
+                    class_id = class_map.get_id(bin_label)
                     yolo_lines.append(f"{class_id} {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}")
                 # Write YOLO label file
                 rel_dir = os.path.relpath(book_dir, angelina_books_root)
